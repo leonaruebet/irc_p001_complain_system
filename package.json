@@ -1,0 +1,16 @@
+{
+  "name": "complaint-management-system",
+  "version": "1.0.0",
+  "description": "LINE OA integrated complaint management system with HR dashboard - Next.js Full Stack",
+  "private": true,
+  "scripts": {
+    "dev": "cd web && npm run dev",
+    "build": "cd web && npm run build",
+    "start": "cd web && npm start",
+    "install:all": "npm install && cd web && npm install",
+    "setup": "npm run install:all && echo '\nSetup complete! Fill in .env.local and run: npm run dev'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

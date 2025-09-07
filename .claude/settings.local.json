@@ -4,7 +4,12 @@
       "Bash(git init:*)",
       "Bash(gh repo create:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(git push:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []
