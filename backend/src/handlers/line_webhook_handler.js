@@ -4,10 +4,12 @@
  */
 
 const lineService = require('../services/line_service');
+const { Employee, ComplaintSession, LineEventsRaw } = require('../models');
 
 class LineWebhookHandler {
   constructor() {
-    console.log('🎯 LineWebhookHandler initialized');
+    this.activeComplaintSessions = new Map(); // userId -> timeout
+    console.log('🎯 LineWebhookHandler initialized with database integration');
   }
 
   /**
@@ -37,6 +39,9 @@ class LineWebhookHandler {
     console.log(`🔄 Processing event type: ${event.type}`);
     
     try {
+      // Save raw event to database for audit
+      await this.save_raw_event(event);
+      
       switch (event.type) {
         case 'message':
           await this.handle_message_event(event);
@@ -69,16 +74,19 @@ class LineWebhookHandler {
    * @returns {Promise<void>}
    */
   async handle_message_event(event) {
-    const { replyToken, source, message } = event;
+    const { replyToken, source, message, timestamp } = event;
     const userId = source.userId;
     
     console.log(`💬 Message from user ${userId}: ${message.text || 'Non-text message'}`);
     
     try {
+      // Ensure user is registered in employee database
+      await this.register_user_if_new(userId);
+      
       if (message.type === 'text') {
-        await this.process_text_message(replyToken, userId, message.text);
+        await this.process_text_message(replyToken, userId, message.text, timestamp);
       } else {
-        await this.handle_non_text_message(replyToken, userId, message);
+        await this.handle_non_text_message(replyToken, userId, message, timestamp);
       }
     } catch (error) {
       console.error('❌ Error handling message event:', error);
@@ -93,17 +101,31 @@ class LineWebhookHandler {
    * @param {string} text - Message text content
    * @returns {Promise<void>}
    */
-  async process_text_message(replyToken, userId, text) {
+  async process_text_message(replyToken, userId, text, timestamp) {
     const normalizedText = text.toLowerCase().trim();
     
     console.log(`🔍 Processing text: "${normalizedText}"`);
     
+    // Check if user has active complaint session
+    const activeSession = await ComplaintSession.findActiveSession(userId);
+    
     // Command routing based on text content
-    if (normalizedText.includes('สวัสดี') || normalizedText.includes('hello') || normalizedText === 'hi') {
+    if (normalizedText.startsWith('/complain')) {
+      await this.start_complaint_session(replyToken, userId, timestamp);
+    }
+    else if (normalizedText.startsWith('/submit')) {
+      await this.submit_complaint_session(replyToken, userId, timestamp);
+    }
+    else if (activeSession) {
+      // User has active complaint session - capture all messages
+      await this.add_message_to_session(activeSession, 'user', 'text', text, timestamp);
+      await this.acknowledge_complaint_message(replyToken);
+    }
+    else if (normalizedText.includes('สวัสดี') || normalizedText.includes('hello') || normalizedText === 'hi') {
       await this.send_welcome_message(replyToken, userId);
     } 
-    else if (normalizedText.includes('ร้องเรียน') || normalizedText.includes('complaint') || normalizedText.startsWith('/complain')) {
-      await this.start_complaint_process(replyToken, userId);
+    else if (normalizedText.includes('ร้องเรียน') || normalizedText.includes('complaint')) {
+      await this.start_complaint_session(replyToken, userId, timestamp);
     }
     else if (normalizedText.includes('สถานะ') || normalizedText.includes('status')) {
       await this.check_complaint_status(replyToken, userId);

@@ -1,4 +1,3 @@
 {
-  "/api/complaints/route": "app/api/complaints/route.js",
   "/dashboard/page": "app/dashboard/page.js"
 }

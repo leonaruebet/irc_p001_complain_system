@@ -8,6 +8,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const config = require('./config');
+const dbConnection = require('./database/connection');
 
 // Initialize Express app
 const app = express();
@@ -19,6 +20,12 @@ if (!config.validateConfig()) {
   console.error('❌ Configuration validation failed. Exiting...');
   process.exit(1);
 }
+
+// Connect to database
+dbConnection.connect().then(() => {
+  // Create indexes after successful connection
+  dbConnection.createIndexes();
+});
 
 // Security middleware
 app.use(helmet());
@@ -39,6 +46,25 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 const lineRoutes = require('./routes/line_routes');
+
+// tRPC setup (will be enabled after installing dependencies)
+try {
+  const { createExpressMiddleware } = require('@trpc/server/adapters/express');
+  const { appRouter } = require('./trpc/app');
+  const { createContext } = require('./trpc/context');
+
+  // Add tRPC middleware
+  app.use('/api/trpc',
+    createExpressMiddleware({
+      router: appRouter,
+      createContext: ({ req, res }) => createContext({ req, res })
+    })
+  );
+  
+  console.log('✅ tRPC API routes enabled at /api/trpc');
+} catch (error) {
+  console.log('⏳ tRPC routes disabled - missing dependencies. Install @trpc/server, zod, mongoose, nanoid to enable.');
+}
 
 // API Routes
 app.use('/api/line', lineRoutes);
@@ -64,7 +90,8 @@ app.get('/', (req, res) => {
       line_webhook: '/api/line/webhook',
       line_push: '/api/line/push',
       line_profile: '/api/line/profile/:userId',
-      line_health: '/api/line/health'
+      line_health: '/api/line/health',
+      trpc_api: '/api/trpc'
     },
     timestamp: new Date().toISOString()
   });
