@@ -1,5 +1,7 @@
 {
   "/api/complaints/route": "app/api/complaints/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/api/analytics/route": "app/api/analytics/route.js",
+  "/api/complaints/[id]/route": "app/api/complaints/[id]/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/complaints/[id]/page": "app/dashboard/complaints/[id]/page.js"
 }

@@ -13,23 +13,50 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const department = searchParams.get('department');
 
+    console.log('🔍 Fetching actual complaints from database...');
+
+    // Get database connection
+    const db = (ComplaintSession as any).db;
+    
+    // Query both collections for actual data
+    const mainCollection = db.collection('complaint_sessions');
+    const altCollection = db.collection('complaintsessions');
+    
+    // Build query
     const query: any = {};
     if (status) query.status = status;
     if (department) query.department = department;
 
-    const skip = (page - 1) * limit;
-    
-    const complaints = await (ComplaintSession as any).find(query)
-      .select('-chat_logs') // Exclude chat logs from list view for performance
+    // Get data from both collections
+    const mainComplaints = await mainCollection.find(query)
+      .project({ chat_logs: 0 }) // Exclude chat logs for performance
       .sort({ start_time: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+      .toArray();
 
-    const total = await (ComplaintSession as any).countDocuments(query);
+    const altComplaints = await altCollection.find(query)
+      .project({ chat_logs: 0 }) // Exclude chat logs for performance  
+      .sort({ start_time: -1 })
+      .toArray();
+
+    // Combine and sort all complaints
+    const allComplaints = [...mainComplaints, ...altComplaints];
+    allComplaints.sort((a, b) => {
+      const dateA = new Date(a.start_time || a.createdAt);
+      const dateB = new Date(b.start_time || b.createdAt);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    console.log(`📊 Found ${mainComplaints.length} complaints in complaint_sessions`);
+    console.log(`📊 Found ${altComplaints.length} complaints in complaintsessions`);
+    console.log(`📊 Total actual complaints: ${allComplaints.length}`);
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    const paginatedComplaints = allComplaints.slice(skip, skip + limit);
+    const total = allComplaints.length;
 
     return NextResponse.json({
-      complaints,
+      complaints: paginatedComplaints,
       pagination: {
         current_page: page,
         total_pages: Math.ceil(total / limit),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -38,38 +38,41 @@ interface ComplaintDetailResponse {
   employee: Employee | null;
 }
 
-export default async function ComplaintDetailPage({
+export default function ComplaintDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id } = use(params);
   const [data, setData] = useState<ComplaintDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const fetchComplaintDetail = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/complaints/${id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError('Complaint not found');
-        } else {
-          throw new Error('Failed to fetch complaint details');
+  const fetchComplaintDetail = () => {
+    setLoading(true);
+    fetch(`/api/complaints/${id}`)
+      .then(response => {
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Complaint not found');
+            setLoading(false);
+            return;
+          } else {
+            throw new Error('Failed to fetch complaint details');
+          }
         }
-        return;
-      }
-      
-      const result: ComplaintDetailResponse = await response.json();
-      setData(result);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
+        return response.json();
+      })
+      .then((result: ComplaintDetailResponse) => {
+        setData(result);
+        setError(null);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setLoading(false);
+      });
   };
 
   useEffect(() => {

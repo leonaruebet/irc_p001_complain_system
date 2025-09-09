@@ -12,24 +12,51 @@ export async function GET(
 
     const { id } = await params;
     
-    const complaint = await (ComplaintSession as any).findOne({
+    console.log(`🔍 Fetching complaint details for ID: ${id}`);
+
+    // Get database connection and search both collections
+    const db = (ComplaintSession as any).db;
+    
+    // Search main collection first
+    const mainCollection = db.collection('complaint_sessions');
+    let complaint = await mainCollection.findOne({
       $or: [
         { _id: id },
         { complaint_id: id }
       ]
-    }).lean();
+    });
+    
+    // If not found, search alternative collection
+    if (!complaint) {
+      const altCollection = db.collection('complaintsessions');
+      complaint = await altCollection.findOne({
+        $or: [
+          { _id: id },
+          { complaint_id: id }
+        ]
+      });
+    }
 
     if (!complaint) {
+      console.log(`❌ Complaint not found: ${id}`);
       return NextResponse.json(
         { error: 'Complaint not found' },
         { status: 404 }
       );
     }
 
+    console.log(`✅ Found complaint: ${complaint.complaint_id}`);
+
     // Get employee info
     let employee = null;
     if (complaint.user_id) {
-      employee = await (Employee as any).findById(complaint.user_id).lean();
+      try {
+        const employeesCollection = db.collection('employees');
+        employee = await employeesCollection.findOne({ _id: complaint.user_id });
+        console.log(`👤 Employee info: ${employee ? 'found' : 'not found'}`);
+      } catch (err) {
+        console.log(`⚠️ Employee lookup failed:`, err);
+      }
     }
 
     return NextResponse.json({

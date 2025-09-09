@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatRelativeTime, getStatusColor, getStatusIcon } from '@/lib/utils';
-import { Eye, RefreshCw } from 'lucide-react';
+import { Eye, RefreshCw, BarChart3, List } from 'lucide-react';
+import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 
 interface Complaint {
   _id: string;
@@ -32,24 +33,27 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'submitted'>('all');
+  const [activeTab, setActiveTab] = useState<'complaints' | 'analytics'>('analytics');
 
-  const fetchComplaints = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (filter !== 'all') params.append('status', filter);
-      
-      const response = await fetch(`/api/complaints?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch complaints');
-      
-      const data: ComplaintsResponse = await response.json();
-      setComplaints(data.complaints);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
+  const fetchComplaints = () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (filter !== 'all') params.append('status', filter);
+    
+    fetch(`/api/complaints?${params.toString()}`)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch complaints');
+        return response.json();
+      })
+      .then((data: ComplaintsResponse) => {
+        setComplaints(data.complaints);
+        setError(null);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -81,20 +85,9 @@ export default function DashboardPage() {
     );
   }
 
-  return (
+  // Component for Complaints List Tab
+  const ComplaintsTab = () => (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Complaints</h1>
-          <p className="text-gray-600">Manage and review employee complaints</p>
-        </div>
-        <Button onClick={fetchComplaints}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
@@ -211,6 +204,50 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">HR Dashboard</h1>
+          <p className="text-gray-600">Analytics and complaint management</p>
+        </div>
+        <Button onClick={fetchComplaints}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+        {[
+          { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+          { key: 'complaints', label: 'Complaints List', icon: List }
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as any)}
+            className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.key
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <tab.icon className="w-4 h-4 mr-2" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'analytics' ? (
+        <AnalyticsDashboard />
+      ) : (
+        <ComplaintsTab />
+      )}
     </div>
   );
 }
