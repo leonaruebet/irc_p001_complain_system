@@ -41,7 +41,11 @@ class LineWebhookHandler {
     try {
       // Save raw event to database for audit
       await this.save_raw_event(event);
-      
+    } catch (rawEventError) {
+      console.error(`❌ RAW EVENT SAVE FAILED:`, rawEventError);
+    }
+    
+    try {
       switch (event.type) {
         case 'message':
           await this.handle_message_event(event);
@@ -171,48 +175,276 @@ class LineWebhookHandler {
   }
 
   /**
-   * Starts the complaint submission process
-   * @param {string} replyToken - Reply token
+   * Saves raw LINE event to database for audit
+   * @param {Object} event - LINE webhook event
+   * @returns {Promise<void>}
+   */
+  async save_raw_event(event) {
+    try {
+      if (!event || !event.type) {
+        console.error('❌ Invalid event data for raw event logging:', event);
+        return;
+      }
+      
+      const eventId = `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const userId = event.source ? event.source.userId : null;
+      
+      await LineEventsRaw.create({
+        _id: eventId,
+        received_at: new Date(),
+        user_id: userId,
+        event_type: event.type,
+        payload: event
+      });
+      console.log(`✅ Raw event saved: ${event.type} (${eventId})`);
+    } catch (error) {
+      console.error('❌ Error saving raw event:', error);
+    }
+  }
+
+  /**
+   * Registers new user to employees collection
    * @param {string} userId - LINE user ID
    * @returns {Promise<void>}
    */
-  async start_complaint_process(replyToken, userId) {
-    console.log(`📝 Starting complaint process for user: ${userId}`);
-    
-    // Test message to verify bot is working
-    const testMessage = "ควยไรสัส";
+  async register_user_if_new(userId) {
+    try {
+      const existingEmployee = await Employee.findById(userId);
+      
+      if (!existingEmployee) {
+        console.log(`👤 Registering new user: ${userId}`);
+        
+        // Get user profile from LINE
+        const profile = await lineService.get_user_profile(userId);
+        
+        await Employee.createOrUpdate(userId, {
+          display_name: profile.displayName || 'Unknown User',
+          department: null // Will be set later by HR
+        });
+        
+        console.log(`✅ User ${userId} registered as new employee`);
+      }
+    } catch (error) {
+      console.error('❌ Error registering new user:', error);
+    }
+  }
+
+  /**
+   * Starts a new complaint session
+   * @param {string} replyToken - Reply token
+   * @param {string} userId - LINE user ID
+   * @param {number} timestamp - Event timestamp
+   * @returns {Promise<void>}
+   */
+  async start_complaint_session(replyToken, userId, timestamp) {
+    console.log(`📝 Starting complaint session for user: ${userId}`);
     
     try {
-      await lineService.reply_message(replyToken, testMessage);
-      console.log('✅ Test complaint message sent successfully');
-    } catch (error) {
-      console.error('❌ Error sending test complaint message:', error);
+      // Check if user already has active session
+      const existingSession = await ComplaintSession.findActiveSession(userId);
       
-      // Fallback: send quick reply as usual
-      const quickReplyActions = [
-        {
-          type: 'message',
-          label: 'บริการไม่ดี',
-          text: 'ร้องเรียน: บริการไม่ดี'
-        },
-        {
-          type: 'message', 
-          label: 'สินค้าเสียหาย',
-          text: 'ร้องเรียน: สินค้าเสียหาย'
-        },
-        {
-          type: 'message',
-          label: 'ปัญหาอื่นๆ',
-          text: 'ร้องเรียน: อื่นๆ'
-        }
-      ];
+      if (existingSession) {
+        const message = `คุณมีการร้องเรียนที่ยังไม่เสร็จสิ้น (${existingSession.complaint_id})
+        
+กรุณาส่งข้อความเพิ่มเติมหรือพิมพ์ "/submit" เพื่อส่งร้องเรียนนี้
 
-      const message = lineService.create_quick_reply(
-        'กรุณาเลือกประเภทการร้องเรียน หรือพิมพ์รายละเอียดที่ต้องการร้องเรียน',
-        quickReplyActions
-      );
+หากต้องการเริ่มร้องเรียนใหม่ กรุณาส่งร้องเรียนเก่าก่อน`;
+        
+        await lineService.reply_message(replyToken, message);
+        return;
+      }
 
-      await lineService.reply_message(replyToken, message);
+      // Get employee data for department mapping
+      const employee = await Employee.findById(userId);
+      const department = employee ? employee.department : null;
+      
+      // Create new complaint session
+      const session = await ComplaintSession.createNewSession(userId, department);
+      
+      // Add initial command to chat log
+      await session.addChatLog('user', 'command', '/complain');
+      
+      // Set up 10-minute timeout
+      this.setup_session_timeout(userId);
+      
+      const startMessage = `✅ เริ่มการร้องเรียนแล้ว
+รหัสการร้องเรียน: ${session.complaint_id}
+
+🗨️ กรุณาส่งรายละเอียดการร้องเรียนของคุณ
+📝 คุณสามารถส่งข้อความได้หลายครั้ง
+📤 เมื่อเสร็จสิ้นให้พิมพ์ "/submit" เพื่อส่งร้องเรียน
+
+⏰ เซสชันจะหมดอายุใน 10 นาที หากไม่มีการตอบกลับ`;
+
+      await lineService.reply_message(replyToken, startMessage);
+      
+      // Add bot response to chat log
+      await session.addChatLog('bot', 'text', startMessage);
+      
+      console.log(`✅ Complaint session created: ${session.complaint_id}`);
+      
+    } catch (error) {
+      console.error('❌ Error starting complaint session:', error);
+      await this.send_error_message(replyToken);
+    }
+  }
+
+  /**
+   * Submits active complaint session
+   * @param {string} replyToken - Reply token
+   * @param {string} userId - LINE user ID
+   * @param {number} timestamp - Event timestamp
+   * @returns {Promise<void>}
+   */
+  async submit_complaint_session(replyToken, userId, timestamp) {
+    console.log(`📤 Submitting complaint session for user: ${userId}`);
+    
+    try {
+      const activeSession = await ComplaintSession.findActiveSession(userId);
+      
+      if (!activeSession) {
+        const message = `ไม่พบการร้องเรียนที่กำลังดำเนินการ
+
+หากต้องการเริ่มร้องเรียนใหม่ กรุณาพิมพ์ "/complain"`;
+        
+        await lineService.reply_message(replyToken, message);
+        return;
+      }
+
+      // Add submit command to chat log
+      await activeSession.addChatLog('user', 'command', '/submit');
+      
+      // Submit the session
+      await activeSession.submit();
+      
+      // Clear timeout
+      this.clear_session_timeout(userId);
+      
+      const submitMessage = `✅ ส่งร้องเรียนเรียบร้อยแล้ว
+รหัสการร้องเรียน: ${activeSession.complaint_id}
+
+📋 ทีมงานจะตรวจสอบและติดตามผลภายใน 24-48 ชั่วโมง
+🔍 ตรวจสอบสถานะได้ด้วยคำสั่ง "สถานะ ${activeSession.complaint_id}"
+
+ขอบคุณที่แจ้งให้เราทราบ 🙏`;
+
+      await lineService.reply_message(replyToken, submitMessage);
+      
+      // Add bot response to chat log
+      await activeSession.addChatLog('bot', 'text', submitMessage);
+      
+      console.log(`✅ Complaint submitted: ${activeSession.complaint_id}`);
+      
+    } catch (error) {
+      console.error('❌ Error submitting complaint:', error);
+      await this.send_error_message(replyToken);
+    }
+  }
+
+  /**
+   * Adds message to active complaint session
+   * @param {Object} session - Active complaint session
+   * @param {string} direction - 'user' or 'bot'
+   * @param {string} messageType - Type of message
+   * @param {string} message - Message content
+   * @param {number} timestamp - Message timestamp
+   * @returns {Promise<void>}
+   */
+  async add_message_to_session(session, direction, messageType, message, timestamp) {
+    try {
+      await session.addChatLog(direction, messageType, message);
+      
+      // Reset timeout on user activity
+      if (direction === 'user') {
+        this.setup_session_timeout(session.user_id);
+      }
+      
+      console.log(`💬 Message added to session ${session.complaint_id}`);
+    } catch (error) {
+      console.error('❌ Error adding message to session:', error);
+    }
+  }
+
+  /**
+   * Acknowledges complaint message during active session
+   * @param {string} replyToken - Reply token
+   * @returns {Promise<void>}
+   */
+  async acknowledge_complaint_message(replyToken) {
+    const acknowledgments = [
+      '📝 ได้รับข้อมูลแล้ว กรุณาส่งข้อมูลเพิ่มเติมหรือพิมพ์ "/submit" เมื่อเสร็จสิ้น',
+      '✅ รับทราบ คุณสามารถส่งรายละเอียดเพิ่มเติมได้',
+      '📋 บันทึกแล้ว ส่งข้อมูลเพิ่มเติมหรือพิมพ์ "/submit" เพื่อส่งร้องเรียน'
+    ];
+    
+    const randomAck = acknowledgments[Math.floor(Math.random() * acknowledgments.length)];
+    await lineService.reply_message(replyToken, randomAck);
+  }
+
+  /**
+   * Sets up 10-minute timeout for complaint session
+   * @param {string} userId - LINE user ID
+   */
+  setup_session_timeout(userId) {
+    // Clear existing timeout
+    this.clear_session_timeout(userId);
+    
+    // Set new timeout
+    const timeout = setTimeout(async () => {
+      await this.handle_session_timeout(userId);
+    }, 10 * 60 * 1000); // 10 minutes
+    
+    this.activeComplaintSessions.set(userId, timeout);
+    console.log(`⏰ Session timeout set for user: ${userId}`);
+  }
+
+  /**
+   * Clears session timeout
+   * @param {string} userId - LINE user ID
+   */
+  clear_session_timeout(userId) {
+    const timeout = this.activeComplaintSessions.get(userId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.activeComplaintSessions.delete(userId);
+      console.log(`⏰ Session timeout cleared for user: ${userId}`);
+    }
+  }
+
+  /**
+   * Handles session timeout (auto-submit after 10 minutes)
+   * @param {string} userId - LINE user ID
+   */
+  async handle_session_timeout(userId) {
+    console.log(`⏰ Session timeout for user: ${userId}`);
+    
+    try {
+      const activeSession = await ComplaintSession.findActiveSession(userId);
+      
+      if (activeSession && activeSession.chat_logs.length > 1) {
+        // Auto-submit if user provided content
+        await activeSession.addChatLog('system', 'timeout', 'Session auto-submitted due to 10-minute timeout');
+        await activeSession.submit();
+        
+        // Notify user via push message
+        const timeoutMessage = `⏰ การร้องเรียนของคุณถูกส่งอัตโนมัติเนื่องจากไม่มีการตอบกลับ
+รหัสการร้องเรียน: ${activeSession.complaint_id}
+
+ทีมงานจะตรวจสอบและติดตามผลต่อไป 📋`;
+
+        await lineService.push_message(userId, timeoutMessage);
+        
+        console.log(`✅ Session auto-submitted: ${activeSession.complaint_id}`);
+      } else if (activeSession) {
+        // Cancel empty session
+        await activeSession.cancel();
+        console.log(`❌ Empty session cancelled: ${activeSession.complaint_id}`);
+      }
+      
+      this.clear_session_timeout(userId);
+      
+    } catch (error) {
+      console.error('❌ Error handling session timeout:', error);
     }
   }
 
@@ -289,15 +521,34 @@ class LineWebhookHandler {
    * @param {Object} message - LINE message object
    * @returns {Promise<void>}
    */
-  async handle_non_text_message(replyToken, userId, message) {
+  async handle_non_text_message(replyToken, userId, message, timestamp) {
     console.log(`📎 Handling non-text message type: ${message.type}`);
     
-    const responseMessage = `ได้รับ ${message.type} ของคุณแล้วค่ะ 📎
+    // Check if user has active complaint session
+    const activeSession = await ComplaintSession.findActiveSession(userId);
+    
+    if (activeSession) {
+      // Add non-text message to active session
+      const messageContent = `[${message.type.toUpperCase()}] ${message.id || 'media content'}`;
+      await this.add_message_to_session(activeSession, 'user', message.type, messageContent, timestamp);
+      
+      const responseMessage = `📎 ได้รับ${message.type}ของคุณในการร้องเรียนแล้ว
+      
+คุณสามารถส่งข้อมูลเพิ่มเติมหรือพิมพ์ "/submit" เพื่อส่งร้องเรียน`;
+      
+      await lineService.reply_message(replyToken, responseMessage);
+      
+      // Add bot response to session
+      await activeSession.addChatLog('bot', 'text', responseMessage);
+      
+    } else {
+      const responseMessage = `ได้รับ ${message.type} ของคุณแล้วค่ะ 📎
 
-หากต้องการส่งข้อร้องเรียน กรุณาพิมพ์ "ร้องเรียน" 
-หรือพิมพ์รายละเอียดเป็นข้อความค่ะ`;
+หากต้องการเริ่มร้องเรียน กรุณาพิมพ์ "/complain" 
+หรือ "ร้องเรียน" เพื่อเริ่มกระบวนการร้องเรียน`;
 
-    await lineService.reply_message(replyToken, responseMessage);
+      await lineService.reply_message(replyToken, responseMessage);
+    }
   }
 
   /**
@@ -312,7 +563,13 @@ class LineWebhookHandler {
     console.log(`➕ User followed: ${userId}`);
     
     try {
+      // Register new user automatically when they follow
+      await this.register_user_if_new(userId);
+      
+      // Send welcome message
       await this.send_welcome_message(replyToken, userId);
+      
+      console.log(`✅ New follower registered and welcomed: ${userId}`);
     } catch (error) {
       console.error('❌ Error handling follow event:', error);
     }

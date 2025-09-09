@@ -15,13 +15,13 @@ const ChatLogSchema = new Schema({
   },
   direction: { 
     type: String, 
-    enum: ['user', 'bot'], 
+    enum: ['user', 'bot', 'system'], 
     required: true,
-    description: 'Message direction: user or bot'
+    description: 'Message direction: user, bot, or system'
   },
   message_type: { 
     type: String, 
-    enum: ['text', 'image', 'file', 'command'], 
+    enum: ['text', 'image', 'file', 'command', 'timeout'], 
     required: true,
     description: 'Type of message content'
   },
@@ -56,7 +56,7 @@ const ComplaintSessionSchema = new Schema({
   },
   status: { 
     type: String, 
-    enum: ['open', 'submitted'], 
+    enum: ['open', 'submitted', 'cancelled'], 
     default: 'open', 
     index: true,
     description: 'Current status of the complaint session'
@@ -140,6 +140,24 @@ ComplaintSessionSchema.methods.submit = function() {
     direction: 'bot',
     message_type: 'text',
     message: `Your complaint has been submitted. ID: ${this.complaint_id}`
+  });
+  
+  return this.save();
+};
+
+ComplaintSessionSchema.methods.cancel = function() {
+  console.log(`❌ Cancelling complaint session: ${this._id}`);
+  
+  this.status = 'cancelled';
+  this.end_time = new Date();
+  this.updated_at = new Date();
+  
+  // Add cancellation note to chat log
+  this.chat_logs.push({
+    timestamp: new Date(),
+    direction: 'system',
+    message_type: 'text',
+    message: `Session cancelled due to inactivity. ID: ${this.complaint_id}`
   });
   
   return this.save();
@@ -264,7 +282,7 @@ ComplaintSessionSchema.statics.getValidator = function() {
         _id: { bsonType: "string" },
         complaint_id: { bsonType: "string" },
         user_id: { bsonType: "string" },
-        status: { enum: ["open", "submitted"] },
+        status: { enum: ["open", "submitted", "cancelled"] },
         start_time: { bsonType: "date" },
         end_time: { bsonType: ["date", "null"] },
         department: { bsonType: "string" },
@@ -276,8 +294,8 @@ ComplaintSessionSchema.statics.getValidator = function() {
             required: ["timestamp", "direction", "message_type", "message"],
             properties: {
               timestamp: { bsonType: "date" },
-              direction: { enum: ["user", "bot"] },
-              message_type: { enum: ["text", "image", "file", "command"] },
+              direction: { enum: ["user", "bot", "system"] },
+              message_type: { enum: ["text", "image", "file", "command", "timeout"] },
               message: { bsonType: "string" }
             }
           }
