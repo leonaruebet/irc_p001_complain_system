@@ -19,7 +19,8 @@
       "Bash(ngrok:*)",
       "Read(//var/folders/jv/0nhk4q1j5x9dnrj8wdct2nh40000gn/T/TemporaryItems/NSIRD_screencaptureui_jcCb7a/**)",
       "Bash(npm install:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Read(//Users/Workspace/IRC_Workspace/irc_Labs/**)"
     ],
     "deny": [],
     "ask": []

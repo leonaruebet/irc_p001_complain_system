@@ -1,13 +1,123 @@
-# Complaint Webapp — Database Schema & Diagram (MongoDB, single-tenant)
+# IRC Complaint System — Database Schema & tRPC API Documentation
 
-**Context:** LINE OA chat-first complaints using `/complain … /submit`.
+**Context:** LINE Official Account chat-first complaints using `/complain … /submit` workflow.
+**Implementation:** Node.js backend with Express, MongoDB, Mongoose, tRPC, and LINE Messaging API.
 **Access:** HR has **read-only** dashboard (no actions/updates).
 **Note:** **No organization layer** (single tenant; no `org_*` fields).
 **Design choice:** Embed all chat logs **inside** a complaint session doc for fast reads.
+**Status:** ✅ **FULLY IMPLEMENTED AND OPERATIONAL**
 
 ---
 
-## 1) Scope & Assumptions
+## 1) tRPC API Implementation
+
+### 1.1 Router Structure
+
+The tRPC implementation provides type-safe API endpoints for complaint management:
+
+**Main App Router (`src/trpc/app.js`)**
+```javascript
+const appRouter = router({
+  complaint: complaintRouter,
+  employee: employeeRouter
+});
+```
+
+**Complaint Router Procedures (`src/trpc/routers/complaint.js`)**
+
+| Procedure | Type | Authorization | Purpose |
+|-----------|------|---------------|---------|
+| `create` | mutation | loggedProcedure | Create new complaint session |
+| `addChatLog` | mutation | loggedProcedure | Add chat message to active session |
+| `submit` | mutation | loggedProcedure | Submit complaint session |
+| `getActiveSession` | query | loggedProcedure | Get user's active session |
+| `getById` | query | hrProcedure | Get complaint by ID (HR only) |
+| `list` | query | hrProcedure | List complaints with pagination (HR only) |
+| `getStats` | query | hrProcedure | Get complaint statistics (HR only) |
+
+### 1.2 Input Validation (Zod Schemas)
+
+**Create Complaint Session**
+```typescript
+{
+  userId: z.string().min(1, 'User ID is required'),
+  department: z.string().optional()
+}
+```
+
+**Add Chat Log**
+```typescript
+{
+  userId: z.string().min(1),
+  direction: z.enum(['user', 'bot']),
+  messageType: z.enum(['text', 'image', 'file', 'command']),
+  message: z.string().min(1)
+}
+```
+
+**List Complaints (HR)**
+```typescript
+{
+  status: z.enum(['open', 'submitted']).optional(),
+  limit: z.number().min(1).max(100).default(50),
+  skip: z.number().min(0).default(0),
+  department: z.string().optional()
+}
+```
+
+**Get Statistics (HR)**
+```typescript
+{
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional()
+}
+```
+
+### 1.3 Authorization Layers
+
+- **loggedProcedure**: Employee operations (session management)
+- **hrProcedure**: HR-only operations (dashboard, reports)
+- Activity logging for all operations via `ctx.utils.logActivity()`
+
+### 1.4 Employee Router Procedures
+
+**Employee Router (`src/trpc/routers/employee.js`)**
+
+| Procedure | Type | Authorization | Purpose |
+|-----------|------|---------------|---------|
+| `getProfile` | query | loggedProcedure | Get employee profile by user ID |
+| `updateProfile` | mutation | loggedProcedure | Update employee information |
+| `register` | mutation | public | Auto-register new employee from LINE |
+
+### 1.5 Response Format
+
+All tRPC procedures return standardized response format:
+
+```typescript
+{
+  success: boolean,
+  message: string,
+  data?: any,           // Procedure-specific response data
+  error?: string,       // Error message if success = false
+  pagination?: {        // For list operations
+    total: number,
+    limit: number,
+    skip: number,
+    hasMore: boolean
+  }
+}
+```
+
+### 1.6 Context Integration
+
+Each procedure has access to:
+- `ctx.models`: Mongoose models (ComplaintSession, Employee, etc.)
+- `ctx.utils`: Utility functions including activity logging
+- `ctx.user`: Current user information (from authentication)
+
+---
+
+## 2) Scope & Assumptions
 
 * Employees submit complaints through LINE OA:
 
@@ -21,13 +131,43 @@
 
 ## 2) Collections Overview
 
-| Collection             | Purpose                                            | Key Fields                                                                                                                  | Typical Indexes                                                                     | Retention          |
-| ---------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------ |
-| `employees`            | Employee registry by LINE `userId` and metadata    | `_id`(=line\_user\_id), `display_name`, `department`, `active`                                                              | `{ department:1 }`, `{ active:1 }`                                                  | Keep while active  |
-| `complaint_sessions`   | One doc per complaint flow; **embedded chat logs** | `_id`(session\_id), `complaint_id`, `user_id`, `status`, `start_time`, `end_time`, `chat_logs[]`, *(optional)* `department` | `{ status:1, start_time:-1 }`, `{ user_id:1, start_time:-1 }`, `{ complaint_id:1 }` | 3–7 years (policy) |
-| `line_events_raw`      | Raw LINE webhook payloads (audit/debug)            | `_id`, `received_at`, `user_id`, `event_type`, `payload`                                                                    | `{ received_at:-1 }` + **TTL**                                                      | 30–90 days (TTL)   |
-| `hr_allowlist`         | HR **authorization** (read-only viewers)           | `_id`(IdP subject/OIDC `sub`), `email`, `name`, `roles:["hr_viewer"]`                                                       | `{ roles:1 }`, `{ email:1 }`                                                        | Keep current       |
-| `audit_reads` *(opt.)* | Who viewed what (read trace for privacy/audit)     | `_id`, `when`, `hr_subject`, `object_type`, `object_id`, `ip`, `user_agent`                                                 | `{ when:-1 }`, `{ hr_subject:1, when:-1 }`                                          | 1–2 years          |
+| Collection             | Purpose                                            | Key Fields                                                                                                                  | tRPC Access                                               | Retention          |
+| ---------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------ |
+| `employees`            | Employee registry by LINE `userId` and metadata    | `_id`(=line\_user\_id), `display_name`, `department`, `active`                                                              | `employee.*` procedures                                   | Keep while active  |
+| `complaint_sessions`   | One doc per complaint flow; **embedded chat logs** | `_id`(session\_id), `complaint_id`, `user_id`, `status`, `start_time`, `end_time`, `chat_logs[]`, *(optional)* `department` | `complaint.*` procedures                                  | 3–7 years (policy) |
+| `line_events_raw`      | Raw LINE webhook payloads (audit/debug)            | `_id`, `received_at`, `user_id`, `event_type`, `payload`                                                                    | Direct webhook handling (no tRPC)                        | 30–90 days (TTL)   |
+| `hr_allowlist`         | HR **authorization** (read-only viewers)           | `_id`(IdP subject/OIDC `sub`), `email`, `name`, `roles:["hr_viewer"]`                                                       | Authorization middleware                                  | Keep current       |
+| `audit_reads` *(opt.)* | Who viewed what (read trace for privacy/audit)     | `_id`, `when`, `hr_subject`, `object_type`, `object_id`, `ip`, `user_agent`                                                 | Logged via `ctx.utils.logActivity()`                     | 1–2 years          |
+
+### 2.1 tRPC Integration Points
+
+**Direct Database Operations:**
+- `complaint_sessions` ← Managed via `complaint.*` tRPC procedures
+- `employees` ← Managed via `employee.*` tRPC procedures  
+- `line_events_raw` ← Written directly by LINE webhook handler
+- Activity logging ← All tRPC operations logged to `audit_reads`
+
+### 2.2 Implementation Workflow
+
+```
+LINE User (/complain) → Webhook Handler → tRPC Procedures → MongoDB
+
+1. LINE Message arrives at webhook endpoint
+2. Webhook validates signature and logs raw event
+3. Handler processes commands (/complain, /submit)
+4. Handler calls appropriate tRPC procedures:
+   - complaint.create → new session
+   - complaint.addChatLog → store messages
+   - complaint.submit → finalize session
+5. tRPC procedures interact with Mongoose models
+6. All operations logged via ctx.utils.logActivity()
+```
+
+**Tech Stack Integration:**
+- **Frontend**: Next.js dashboard calls tRPC procedures
+- **Backend**: Express.js server with tRPC router
+- **LINE Integration**: Webhook handler → tRPC procedure calls
+- **Database**: MongoDB with Mongoose ODM and schema validation
 
 > If a single conversation could exceed \~500–1000 messages or doc size >2–4 MB, shard logs into a separate `complaint_logs` collection. For typical HR use, **embedded** is fine.
 
