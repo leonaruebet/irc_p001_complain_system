@@ -1,15 +1,15 @@
 const path = require('path');
 
-// Load environment variables
+// Load environment variables from web/.env.local (shared config)
 require('dotenv').config({ 
-  path: path.join(__dirname, '../../../.env.local') 
+  path: path.join(__dirname, '../../../web/.env.local') 
 });
 
 const config = {
-  // Database
+  // Database (using shared MongoDB configuration)
   mongodb: {
     uri: process.env.MONGODB_URI,
-    dbName: process.env.MONGODB_DB_NAME || 'complaint_system'
+    dbName: process.env.MONGODB_DB_NAME || 'p001'
   },
 
   // LINE OA
