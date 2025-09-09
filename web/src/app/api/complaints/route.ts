@@ -19,14 +19,14 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
     
-    const complaints = await ComplaintSession.find(query)
+    const complaints = await (ComplaintSession as any).find(query)
       .select('-chat_logs') // Exclude chat logs from list view for performance
       .sort({ start_time: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const total = await ComplaintSession.countDocuments(query);
+    const total = await (ComplaintSession as any).countDocuments(query);
 
     return NextResponse.json({
       complaints,
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate IDs
-    const sessionId = ComplaintSession.generateSessionId();
-    const complaintId = ComplaintSession.generateComplaintId();
+    const sessionId = (ComplaintSession as any).generateSessionId();
+    const complaintId = (ComplaintSession as any).generateComplaintId();
 
     // Create complaint session
     const complaint = new ComplaintSession({

@@ -1,4 +1,4 @@
-import { Client, WebhookEvent, TextMessage, MessageAPIResponseBase } from '@line/bot-sdk';
+import { Client, WebhookEvent, TextMessage, MessageAPIResponseBase, validateSignature } from '@line/bot-sdk';
 import { config } from './config';
 
 class LineClient {
@@ -44,7 +44,7 @@ class LineClient {
   // Validate signature
   validateSignature(body: string, signature: string): boolean {
     try {
-      return this.client.validateSignature(body, config.line.channelSecret, signature);
+      return validateSignature(body, config.line.channelSecret, signature);
     } catch (error) {
       console.error('Error validating signature:', error);
       return false;

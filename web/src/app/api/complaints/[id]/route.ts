@@ -5,14 +5,14 @@ import Employee from '@/lib/models/Employee';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    const { id } = params;
+    const { id } = await params;
     
-    const complaint = await ComplaintSession.findOne({
+    const complaint = await (ComplaintSession as any).findOne({
       $or: [
         { _id: id },
         { complaint_id: id }
@@ -29,7 +29,7 @@ export async function GET(
     // Get employee info
     let employee = null;
     if (complaint.user_id) {
-      employee = await Employee.findById(complaint.user_id).lean();
+      employee = await (Employee as any).findById(complaint.user_id).lean();
     }
 
     return NextResponse.json({
@@ -50,12 +50,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { status, notes } = body;
 
@@ -81,7 +81,7 @@ export async function PUT(
       };
     }
 
-    const complaint = await ComplaintSession.findOneAndUpdate(
+    const complaint = await (ComplaintSession as any).findOneAndUpdate(
       {
         $or: [
           { _id: id },

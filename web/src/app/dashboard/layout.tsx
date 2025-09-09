@@ -1,11 +1,20 @@
+'use client';
+
 import Link from 'next/link';
 import { FileText, BarChart3, Settings, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [current_date, set_current_date] = useState<string>('');
+  
+  useEffect(() => {
+    set_current_date(new Date().toLocaleDateString());
+  }, []);
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
@@ -60,7 +69,7 @@ export default function DashboardLayout({
             </h2>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                {new Date().toLocaleDateString()}
+                {current_date}
               </span>
               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
                 HR

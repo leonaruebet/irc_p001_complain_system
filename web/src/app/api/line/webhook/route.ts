@@ -46,7 +46,7 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
 
   const messageEvent = event as MessageEvent;
   const userId = messageEvent.source.userId;
-  const messageText = messageEvent.message.text.trim();
+  const messageText = (messageEvent.message as any).text.trim();
   const replyToken = messageEvent.replyToken;
 
   if (!userId) {

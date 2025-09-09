@@ -38,11 +38,12 @@ interface ComplaintDetailResponse {
   employee: Employee | null;
 }
 
-export default function ComplaintDetailPage({
+export default async function ComplaintDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const [data, setData] = useState<ComplaintDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function ComplaintDetailPage({
   const fetchComplaintDetail = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/complaints/${params.id}`);
+      const response = await fetch(`/api/complaints/${id}`);
       if (!response.ok) {
         if (response.status === 404) {
           setError('Complaint not found');
@@ -73,7 +74,7 @@ export default function ComplaintDetailPage({
 
   useEffect(() => {
     fetchComplaintDetail();
-  }, [params.id]);
+  }, [id]);
 
   if (loading) {
     return (

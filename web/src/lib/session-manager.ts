@@ -13,7 +13,7 @@ class SessionManager {
   // Get active session for user
   async getActiveSession(userId: string): Promise<SessionData | null> {
     try {
-      const session = await ComplaintSession.findOne({
+      const session = await (ComplaintSession as any).findOne({
         user_id: userId,
         status: 'open'
       }).sort({ start_time: -1 });
@@ -39,8 +39,8 @@ class SessionManager {
       const userProfile = await this.getOrCreateEmployee(userId);
       
       // Generate IDs
-      const sessionId = ComplaintSession.generateSessionId();
-      const complaintId = ComplaintSession.generateComplaintId();
+      const sessionId = (ComplaintSession as any).generateSessionId();
+      const complaintId = (ComplaintSession as any).generateComplaintId();
 
       const session = new ComplaintSession({
         _id: sessionId,
@@ -83,7 +83,7 @@ class SessionManager {
         message
       };
 
-      await ComplaintSession.findOneAndUpdate(
+      await (ComplaintSession as any).findOneAndUpdate(
         {
           user_id: userId,
           status: 'open'
@@ -109,7 +109,7 @@ class SessionManager {
         message
       };
 
-      await ComplaintSession.findOneAndUpdate(
+      await (ComplaintSession as any).findOneAndUpdate(
         {
           user_id: userId,
           status: 'open'
@@ -128,7 +128,7 @@ class SessionManager {
   // Submit complaint (close session)
   async submitComplaint(userId: string): Promise<string | null> {
     try {
-      const session = await ComplaintSession.findOneAndUpdate(
+      const session = await (ComplaintSession as any).findOneAndUpdate(
         {
           user_id: userId,
           status: 'open'
@@ -153,7 +153,7 @@ class SessionManager {
   // Cancel active session
   async cancelSession(userId: string): Promise<boolean> {
     try {
-      const result = await ComplaintSession.deleteOne({
+      const result = await (ComplaintSession as any).deleteOne({
         user_id: userId,
         status: 'open'
       });
@@ -168,7 +168,7 @@ class SessionManager {
   // Get or create employee record
   private async getOrCreateEmployee(userId: string, displayName?: string): Promise<any> {
     try {
-      let employee = await Employee.findById(userId);
+      let employee = await (Employee as any).findById(userId);
       
       if (!employee && displayName) {
         employee = new Employee({
