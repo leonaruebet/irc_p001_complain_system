@@ -131,6 +131,25 @@ const complaintRouter = router({
           userId: input.userId
         });
         
+        // Trigger AI analysis in the background (don't wait for it to complete)
+        if (process.env.GEMINI_API_KEY) {
+          console.log('🤖 Triggering background AI analysis for complaint:', session.complaint_id);
+          
+          // Import and trigger AI processing without blocking the response
+          setImmediate(async () => {
+            try {
+              const AITaggingService = require('../../services/ai_tagging_service');
+              const aiService = new AITaggingService();
+              await aiService.processComplaintSession(session._id);
+              console.log('✅ Background AI analysis completed for:', session.complaint_id);
+            } catch (error) {
+              console.error('❌ Background AI analysis failed for:', session.complaint_id, error.message);
+            }
+          });
+        } else {
+          console.log('⚠️ GEMINI_API_KEY not configured, skipping AI analysis');
+        }
+        
         return {
           success: true,
           session: session.getConversationSummary(),

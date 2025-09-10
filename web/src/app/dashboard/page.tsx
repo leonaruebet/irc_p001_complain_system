@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatRelativeTime, getStatusColor, getStatusIcon } from '@/lib/utils';
-import { Eye, RefreshCw, BarChart3, List } from 'lucide-react';
+import { Eye, RefreshCw, BarChart3, List, Brain } from 'lucide-react';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
+import AIAnalyticsDashboard from '@/components/AIAnalyticsDashboard';
 
 interface Complaint {
   _id: string;
@@ -33,7 +34,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'submitted'>('all');
-  const [activeTab, setActiveTab] = useState<'complaints' | 'analytics'>('analytics');
+  const [activeTab, setActiveTab] = useState<'complaints' | 'analytics' | 'ai-analytics'>('ai-analytics');
 
   const fetchComplaints = () => {
     setLoading(true);
@@ -224,7 +225,8 @@ export default function DashboardPage() {
       {/* Tab Navigation */}
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
         {[
-          { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+          { key: 'ai-analytics', label: 'AI Analytics', icon: Brain },
+          { key: 'analytics', label: 'Basic Analytics', icon: BarChart3 },
           { key: 'complaints', label: 'Complaints List', icon: List }
         ].map((tab) => (
           <button
@@ -243,7 +245,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'analytics' ? (
+      {activeTab === 'ai-analytics' ? (
+        <AIAnalyticsDashboard />
+      ) : activeTab === 'analytics' ? (
         <AnalyticsDashboard />
       ) : (
         <ComplaintsTab />

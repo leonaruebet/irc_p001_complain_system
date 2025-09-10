@@ -6,10 +6,12 @@
 const { router } = require('./index');
 const complaintRouter = require('./routers/complaint');
 const employeeRouter = require('./routers/employee');
+const aiTaggingRouter = require('./routers/ai_tagging');
 
 const appRouter = router({
   complaint: complaintRouter,
-  employee: employeeRouter
+  employee: employeeRouter,
+  aiTagging: aiTaggingRouter
 });
 
 // Export the router type for client-side type inference

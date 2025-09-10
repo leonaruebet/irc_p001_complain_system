@@ -5,6 +5,11 @@ require('dotenv').config({
   path: path.join(__dirname, '../../../web/.env.local') 
 });
 
+// Also load from local .env file as fallback
+require('dotenv').config({ 
+  path: path.join(__dirname, '../../.env') 
+});
+
 const config = {
   // Database (using shared MongoDB configuration)
   mongodb: {
@@ -40,6 +45,12 @@ const config = {
   // CORS
   cors: {
     origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000'
+  },
+
+  // AI Configuration
+  ai: {
+    geminiApiKey: process.env.GEMINI_API_KEY,
+    googleApiKey: process.env.GOOGLE_API_KEY
   }
 };
 

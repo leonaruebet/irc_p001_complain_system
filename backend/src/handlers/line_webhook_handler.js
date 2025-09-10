@@ -317,6 +317,24 @@ class LineWebhookHandler {
       // Submit the session
       await activeSession.submit();
       
+      // Trigger AI analysis in the background
+      if (process.env.GEMINI_API_KEY) {
+        console.log('🤖 Triggering background AI analysis for complaint:', activeSession.complaint_id);
+        
+        setImmediate(async () => {
+          try {
+            const AITaggingService = require('../services/ai_tagging_service');
+            const aiService = new AITaggingService();
+            await aiService.processComplaintSession(activeSession._id);
+            console.log('✅ Background AI analysis completed for:', activeSession.complaint_id);
+          } catch (error) {
+            console.error('❌ Background AI analysis failed for:', activeSession.complaint_id, error.message);
+          }
+        });
+      } else {
+        console.log('⚠️ GEMINI_API_KEY not configured, skipping AI analysis');
+      }
+      
       // Clear timeout
       this.clear_session_timeout(userId);
       

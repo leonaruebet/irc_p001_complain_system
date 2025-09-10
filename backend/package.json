@@ -21,6 +21,7 @@
   "author": "IRC Team",
   "license": "MIT",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@trpc/server": "^10.45.2",
     "axios": "^1.5.0",
     "cors": "^2.8.5",
