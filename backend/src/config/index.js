@@ -45,9 +45,27 @@ const config = {
   // CORS
   cors: {
     origin: (() => {
-      const corsOrigin = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000';
-      // Clean up any array brackets or invalid characters
-      return corsOrigin.replace(/[\[\]"]/g, '').trim();
+      // Get the raw cors origin value
+      let corsOrigin = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000';
+      
+      // Handle array-like strings from Railway environment variables
+      if (typeof corsOrigin === 'string') {
+        // Remove array brackets, quotes, and extra whitespace
+        corsOrigin = corsOrigin
+          .replace(/^\[|\]$/g, '')  // Remove outer brackets
+          .replace(/^["']|["']$/g, '')  // Remove quotes
+          .replace(/[\[\]"']/g, '')  // Remove any remaining brackets/quotes
+          .split(',')[0]  // Take first URL if multiple
+          .trim();
+      }
+      
+      // Fallback to known working URL if still invalid
+      if (!corsOrigin || corsOrigin.includes('[') || corsOrigin.includes(']')) {
+        corsOrigin = 'https://frontend-production-9296.up.railway.app';
+      }
+      
+      console.log('🌐 CORS Origin configured:', corsOrigin);
+      return corsOrigin;
     })()
   },
 
