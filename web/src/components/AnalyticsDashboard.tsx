@@ -294,7 +294,7 @@ export default function AnalyticsDashboard() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -399,22 +399,36 @@ export default function AnalyticsDashboard() {
               <div>
                 <span className="font-medium text-gray-600">Query Period:</span>
                 <br />
-                {metadata.query_period_days} days
+                <span className="text-gray-900">
+                  {metadata.query_period_days} days
+                </span>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Sessions Analyzed:</span>
                 <br />
-                {metadata.sessions_analyzed}
+                <span className="text-gray-900">
+                  {metadata.sessions_analyzed}
+                </span>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Messages Analyzed:</span>
                 <br />
-                {metadata.messages_analyzed}
+                <span className="text-gray-900">
+                  {metadata.messages_analyzed}
+                </span>
               </div>
               <div>
                 <span className="font-medium text-gray-600">Last Updated:</span>
                 <br />
-                {new Date(metadata.last_updated).toLocaleString()}
+                <span className="text-gray-900">
+                  {new Date(metadata.last_updated).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
               </div>
             </div>
           </CardContent>

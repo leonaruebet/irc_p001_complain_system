@@ -222,9 +222,12 @@ export default function AIAnalyticsDashboard() {
   const severityTrendData = useMemo(() => {
     if (!aiAnalytics?.issue_categories?.length) return [];
     
-    // Group by severity level and create a single data point for current period
+    // Group by severity level based on avg_severity_score
     const severityBreakdown = aiAnalytics.issue_categories.reduce((acc, item) => {
-      const severity = item.severity || 'medium'; // fallback if no severity
+      const severityScore = item.avg_severity_score || 2;
+      const severity = severityScore >= 3.5 ? 'critical' :
+                      severityScore >= 2.5 ? 'high' :
+                      severityScore >= 1.5 ? 'medium' : 'low';
       acc[severity] = (acc[severity] || 0) + item.count;
       return acc;
     }, {} as Record<string, number>);
@@ -432,7 +435,7 @@ export default function AIAnalyticsDashboard() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percentage }) => `${name} ${percentage}%`}
+                    label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -810,17 +813,31 @@ export default function AIAnalyticsDashboard() {
             <div>
               <span className="font-medium text-gray-600">Analysis Period:</span>
               <br />
-              {new Date(aiAnalytics.date_range.startDate).toLocaleDateString()} - {new Date(aiAnalytics.date_range.endDate).toLocaleDateString()}
+              <span className="text-gray-900">
+                {new Date(aiAnalytics.date_range.startDate).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })} - {new Date(aiAnalytics.date_range.endDate).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </span>
             </div>
             <div>
               <span className="font-medium text-gray-600">Department Filter:</span>
               <br />
-              {aiAnalytics.department || 'All Departments'}
+              <span className="text-gray-900">
+                {selectedDepartment || 'All Departments'}
+              </span>
             </div>
             <div>
               <span className="font-medium text-gray-600">AI Model:</span>
               <br />
-              Google Gemini 1.5 Pro
+              <span className="text-gray-900">
+                Google Gemini 1.5 Flash
+              </span>
             </div>
           </div>
         </CardContent>
