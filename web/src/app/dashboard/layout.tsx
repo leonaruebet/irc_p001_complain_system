@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FileText, BarChart3, Settings, LogOut } from 'lucide-react';
+import { FileText, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function DashboardLayout({
@@ -32,31 +32,18 @@ export default function DashboardLayout({
             className="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
           >
             <FileText className="w-5 h-5 mr-3" />
-            All Complaints
-          </Link>
-          
-          <Link 
-            href="/dashboard/stats"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
-          >
-            <BarChart3 className="w-5 h-5 mr-3" />
-            Statistics
-          </Link>
-          
-          <Link 
-            href="/dashboard/settings"
-            className="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
-          >
-            <Settings className="w-5 h-5 mr-3" />
-            Settings
+            Dashboard
           </Link>
         </nav>
         
         <div className="absolute bottom-0 w-64 p-6 border-t">
-          <button className="flex items-center text-gray-700 hover:text-red-600 transition-colors">
+          <Link 
+            href="/login"
+            className="flex items-center text-gray-700 hover:text-red-600 transition-colors"
+          >
             <LogOut className="w-5 h-5 mr-3" />
             Sign Out
-          </button>
+          </Link>
         </div>
       </div>
 
