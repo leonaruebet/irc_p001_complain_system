@@ -31,7 +31,8 @@
       "Bash(PORT=3000 npm run dev)",
       "Bash(xargs kill:*)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(railway:*)"
     ],
     "deny": [],
     "ask": []

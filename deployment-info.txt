@@ -1,0 +1,23 @@
+IRC Complaint System - Railway Deployment Info
+===============================================
+
+Deployment Date: Thu Sep 11 12:08:04 +07 2025
+Backend URL: Service Domain created:
+🚀 https://backend-production-1911.up.railway.app
+Frontend URL: Service Domain created:
+🚀 https://frontend-production-9296.up.railway.app
+LINE Webhook URL: Service Domain created:
+🚀 https://backend-production-1911.up.railway.app/api/line/webhook
+
+Environment Variables Set:
+- NODE_ENV=production
+- Database: MongoDB Atlas (existing)
+- LINE Bot: Configured
+- Authentication: Better Auth + NextAuth
+- AI APIs: Google Gemini
+
+Next Steps:
+1. Update LINE webhook URL in LINE Developer Console
+2. Test all application features
+3. Monitor via Railway dashboard
+
