@@ -44,7 +44,11 @@ const config = {
 
   // CORS
   cors: {
-    origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000'
+    origin: (() => {
+      const corsOrigin = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000';
+      // Clean up any array brackets or invalid characters
+      return corsOrigin.replace(/[\[\]"]/g, '').trim();
+    })()
   },
 
   // AI Configuration
