@@ -29,7 +29,9 @@
       "Bash(lsof:*)",
       "Bash(kill:*)",
       "Bash(PORT=3000 npm run dev)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
